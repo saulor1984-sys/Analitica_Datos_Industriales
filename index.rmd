@@ -1,0 +1,544 @@
+---
+title: "Análisis de Datos"
+author: "Saul Ortiz-Santacruz"
+date: "`r format(Sys.Date(), '%d-%m-%Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
+    theme: cosmo
+    highlight: tango
+    code_folding: hide
+  pdf_document:
+    toc: true
+---
+```{r setup, include=FALSE}
+library(ggplot2)
+library(dplyr)
+library(haven)
+library(knitr)
+
+knitr::opts_chunk$set(
+  echo = TRUE,        # <-- CAMBIO CLAVE
+  message = FALSE,
+  warning = FALSE
+)
+```
+
+# Introducción
+
+El presente estudio analiza información proveniente de la Encuesta de Actividad Económica (EAE) del Instituto Nacional de Estadística y Censos (INEC) de Ecuador, con el propósito de caracterizar el comportamiento de variables económicas clave reportadas por las unidades productivas del país. La EAE constituye una fuente oficial y consolidada para comprender la dinámica empresarial, abarcando aspectos como ventas, comercio exterior, personal ocupado y otras dimensiones relevantes para el análisis económico.
+
+El objetivo general de este trabajo es ofrecer una visión clara y estructurada del conjunto de datos, identificando patrones, distribuciones y relaciones existentes entre las variables seleccionadas. En particular, se busca:
+
+Describir la estructura de la base de datos, destacando sus componentes principales y el tipo de información que contiene.
+
+Examinar patrones relevantes, derivados de la exploración inicial de las variables más representativas.
+
+Estimar estadísticas descriptivas que permitan comprender la variabilidad y el comportamiento general de los indicadores analizados.
+
+Apoyar la interpretación mediante visualizaciones, tales como histogramas y boxplots, que facilitan la identificación de tendencias y posibles anomalías en los datos.
+
+Este análisis proporciona una primera aproximación al comportamiento económico de las unidades incluidas en la EAE y sienta las bases para estudios posteriores que profundicen en tendencias sectoriales, relaciones causales o modelos predictivos.
+
+------------------------------------------------------------------------
+
+# Datos
+
+El análisis se basa en la información proveniente de la Encuesta de Actividad Económica (EAE) del Instituto Nacional de Estadística y Censos (INEC), la cual recopila datos detallados sobre el desempeño económico de establecimientos productivos en Ecuador. La base utilizada incluye variables relacionadas con ventas, comercio exterior, personal ocupado y otras características empresariales que permiten describir y modelar el comportamiento económico del sector.
+
+En primer lugar, se realizó una caracterización básica del conjunto de datos, identificando el número de registros, tipos de variables y presencia de valores faltantes. A partir de esta estructura inicial se generaron medidas estadísticas descriptivas —como medias, medianas, desviaciones estándar, rangos y percentiles— para comprender el comportamiento general de las variables más relevantes.
+
+Posteriormente, se incorporaron gráficas descriptivas orientadas a visualizar la distribución y variabilidad de los datos. Entre estas representaciones se incluyen histogramas, diagramas de caja (boxplots) y gráficos de dispersión, que permiten identificar tendencias centrales, niveles de dispersión, asimetrías, valores atípicos y patrones preliminares entre variables.
+
+Además del análisis descriptivo, se desarrolló un estudio exploratorio más profundo, orientado a identificar estructuras subyacentes y relaciones complejas dentro del conjunto de datos. Para ello se aplicaron técnicas multivariantes como:
+
+Análisis factorial exploratorio, destinado a identificar agrupamientos latentes de variables y reducir la dimensionalidad del problema;
+
+Modelos basados en árboles, específicamente Random Forest, utilizados para analizar la importancia de las variables y estimar patrones predictivos en función de los indicadores económicos seleccionados.
+
+Estas técnicas complementan el análisis inicial y permiten obtener una visión integral del comportamiento de los datos, combinando descripción estadística, visualización y métodos avanzados de modelamiento.
+
+## Datos usados
+Para este estudio se empleó la base de datos proveniente de la Encuesta de Actividad Económica (EAE) del Instituto Nacional de Estadística y Censos (INEC) de Ecuador. El archivo original, suministrado en formato SPSS (.sav), contiene información detallada sobre las actividades económicas de establecimientos formales del país, incluyendo variables relacionadas con ventas, personal ocupado, comercio exterior y otros indicadores productivos.
+
+```{r load-data, message=FALSE, warning=FALSE}
+library(haven)
+library(dplyr)
+
+base <- read_sav("SAMPLE_MIL.sav")
+
+```
+
+```{r primeras_20_variables, message=FALSE, warning=FALSE}
+library(knitr)
+
+tabla_20 <- data.frame(
+  Variable = names(base)[1:20]
+)
+
+kable(
+  tabla_20,
+  caption = "Primeras 20 variables de la base de datos",
+  align = "l"
+)
+```
+
+# Análisis Exploratorio
+El análisis exploratorio se enfocó en comprender el comportamiento general de la información contenida en la base de datos de la Encuesta de Actividad Económica (EAE). Para ello, se seleccionaron algunas variables representativas —como ventas totales, importaciones, exportaciones y plazas equivalentes de empleo— con el fin de ilustrar los patrones principales presentes en el conjunto de datos.
+
+Se evaluaron medidas básicas de tendencia central y dispersión, identificándose distribuciones con marcada asimetría y alta variabilidad, características típicas en datos económicos empresariales. Para complementar esta revisión inicial, se generaron visualizaciones descriptivas, tales como histogramas y diagramas de caja, que permiten observar la forma general de la distribución y detectar valores atípicos relevantes.
+
+Adicionalmente, se exploraron de manera preliminar algunas relaciones bivariadas, mediante diagramas de dispersión, lo que permitió identificar patrones no lineales entre variables económicas. Estos hallazgos justifican el desarrollo posterior de análisis más avanzados, como técnicas factoriales y modelos de Random Forest, que permitirán profundizar en la estructura interna del conjunto de datos.
+
+
+## Descriptivos basicos de las variables mas relevantes
+
+```{r seleccionar_relevantes, message=FALSE, warning=FALSE}
+library(dplyr)
+
+# vector con los nombres REALES de tus variables en la base
+vars_relev <- c(
+  "ventas_totales",
+  "importaciones",
+  "exportaciones",
+  "plazas_equiv",
+  "plazas_equiv_hombres",
+  "plazas_equiv_mujeres"
+)
+
+# crear subconjunto de datos relevantes
+datos_relev <- base %>% select(all_of(vars_relev))
+
+```
+
+```{r descriptivos_basicos, echo=FALSE, results='hide'}
+summary(datos_relev)
+
+```{r tabla_resumen, echo=FALSE, message=FALSE, warning=FALSE}
+library(knitr)
+
+# Calcular estadísticos por variable
+stats <- t(
+  sapply(datos_relev, function(x) {
+    c(
+      Min    = min(x, na.rm = TRUE),
+      Q1     = quantile(x, 0.25, na.rm = TRUE),
+      Median = median(x, na.rm = TRUE),
+      Mean   = mean(x, na.rm = TRUE),
+      Q3     = quantile(x, 0.75, na.rm = TRUE),
+      Max    = max(x, na.rm = TRUE),
+      NAs    = sum(is.na(x))
+    )
+  })
+)
+
+# Construir tabla final
+tabla_final <- data.frame(
+  Variable = rownames(stats),
+  stats,
+  row.names = NULL
+)
+
+# Mostrar tabla ordenada
+kable(
+  tabla_final,
+  digits = 2,
+  caption = "Tabla 1. Resumen estadístico de las variables seleccionadas"
+)
+```
+
+## GRAFICOS DESCRIPTIVOS 
+
+Se generaron gráficos descriptivos para algunas de las variables más relevantes del conjunto de datos, con el fin de observar su comportamiento general. Para las variables continuas como ventas totales, importaciones y exportaciones netas se elaboraron histogramas, los cuales evidencian distribuciones altamente asimétricas hacia la derecha, típicas de datos económicos con gran dispersión y presencia de valores extremos.
+
+Asimismo, para variables categóricas como gsectores, código de sección y situación de la empresa se utilizaron gráficos de barras y diagramas circulares, permitiendo visualizar la composición y frecuencia relativa de las empresas según su actividad económica y clasificación administrativa. Estos gráficos facilitan la identificación de concentraciones sectoriales y diferencias estructurales dentro de la muestra analizada.
+
+
+```{r barras_gsectores, echo=TRUE, message=FALSE, warning=FALSE}
+library(ggplot2)
+library(dplyr)
+
+ggplot(base, aes(x = as_factor(gsectores))) +
+  geom_bar(fill = "steelblue") +
+  labs(
+    title = "Número de empresas por sector económico",
+    x = "Sector económico",
+    y = "Número de empresas"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+La Figura muestra la predominancia de ciertos  que sectores puede estar asociada a factores como la dinámica del mercado interno, las barreras de entrada, la especialización productiva y las condiciones regulatorias. Estos resultados constituyen un insumo relevante para el análisis posterior, ya que permiten contextualizar las diferencias observadas en variables económicas y laborales, como ventas, empleo y productividad, entre los distintos sectores económicos.
+
+A manera demostrativa se presenta un historama de frecuencias en función de la variable ventas totales, se aclara la necesidad de un ajuste en escalas, dada las diferencias entre valores extremos. 
+
+```{r}
+base_log <- base %>%
+  filter(!is.na(ventas_totales),
+         ventas_totales > 0)
+
+# Graficar en escala logarítmica
+g2 <- ggplot(base_log, aes(x = ventas_totales)) +
+  geom_histogram(bins = 40, fill = "darkorange", color = "white") +
+  scale_x_log10() +
+  labs(
+    title = "Histograma de Ventas Totales (escala log10)",
+    x = "Ventas Totales (log10)",
+    y = "Frecuencia"
+  ) +
+  theme_minimal()
+
+# Mostrar gráfico 2
+print(g2)
+```
+
+
+
+El objetivo de este apartado es caracterizar la estructura interna de los datos antes de aplicar métodos más avanzados.
+
+------------------------------------------------------------------------
+
+# Análisis Estadístico y Modelos
+
+En esta sección se aplicarán técnicas estadísticas o modelos analíticos según la naturaleza del problema, tales como:
+
+- Asociacion 
+A partir de la base original se extrajo una tabla reducida para el análisis de asociación, compuesta por 850 registros y dos variables: el sector económico (gsectores) y las ventas totales (ventas_totales), excluyendo observaciones con valores faltantes.
+
+Para esto: 
+
+```{r paso1_extraer_2vars, echo=TRUE, message=FALSE, warning=FALSE}
+library(dplyr)
+
+datos_asoc <- base %>%
+  select(gsectores, ventas_totales) %>%
+  filter(!is.na(gsectores), !is.na(ventas_totales))
+```
+
+```{r verificar_dim, echo=TRUE}
+
+dim(datos_asoc)
+```
+
+```{r verificar_names, echo=TRUE, message=FALSE, warning=FALSE}
+names(datos_asoc)
+```
+
+```{r vista_previa_datos_asoc, echo=TRUE, message=FALSE, warning=FALSE}
+library(knitr)
+
+kable(
+  head(datos_asoc, 6),
+  caption = "Vista preliminar del conjunto de datos reducido para el análisis de asociación (sector–ventas)"
+)
+```
+Ahora realizaremos un analisis de asociación. para esto convertimos la variable a alta media y baja. 
+
+```{r paso2_crear_3categorias, echo=TRUE, message=FALSE, warning=FALSE}
+library(dplyr)
+
+# Asegurar que gsectores sea categórica (aunque esté codificada con números)
+datos_asoc$gsectores <- as.factor(datos_asoc$gsectores)
+
+# Mediana solo de ventas positivas (para evitar que muchos ceros dañen el corte)
+med_pos <- median(datos_asoc$ventas_totales[datos_asoc$ventas_totales > 0], na.rm = TRUE)
+
+# Crear 3 categorías robustas
+datos_asoc <- datos_asoc %>%
+  mutate(
+    nivel_ventas3 = case_when(
+      ventas_totales == 0 ~ "Bajas",
+      ventas_totales > 0 & ventas_totales <= med_pos ~ "Medias",
+      ventas_totales > med_pos ~ "Altas",
+      TRUE ~ NA_character_
+    )
+  )
+
+# Asegurar orden de niveles
+datos_asoc$nivel_ventas3 <- factor(datos_asoc$nivel_ventas3, levels = c("Bajas", "Medias", "Altas"))
+
+```
+```{r verificar_3categorias, include=FALSE}
+table(datos_asoc$nivel_ventas3, useNA = "ifany")
+```
+
+Con el fin de analizar los patrones de asociación entre el sector económico y el nivel de ventas, se construyó una tabla de contingencia a partir del conjunto de datos reducido previamente definido. Para ello, las ventas totales fueron clasificadas en tres categorías —bajas, medias y altas— y se cruzaron con la variable sectorial (gsectores). Esta representación permite identificar la distribución conjunta de las empresas según su actividad económica y su desempeño en ventas, constituyendo la base para el análisis exploratorio de asociaciones sectoriales.
+
+```{r tabla_contingencia_sector_ventas, echo=TRUE, message=FALSE, warning=FALSE}
+library(knitr)
+
+# Tabla de contingencia
+tabla_asociacion <- table(datos_asoc$gsectores, datos_asoc$nivel_ventas3)
+
+# Convertir a data.frame y hacer visible el sector como columna
+tabla_df <- as.data.frame.matrix(tabla_asociacion)
+tabla_df <- cbind(Sector = rownames(tabla_df), tabla_df)
+rownames(tabla_df) <- NULL
+
+# Mostrar en el documento final
+kable(
+  tabla_df,
+  caption = "Tabla X. Tabla de contingencia entre sector económico (gsectores) y nivel de ventas"
+)
+
+```
+Con el fin de explorar visualmente la relación entre el sector económico y el nivel de ventas de las empresas, se presenta un gráfico de barras apiladas que muestra la distribución proporcional de las categorías de ventas (bajas, medias y altas) en cada sector. Esta representación permite identificar de manera preliminar diferencias en el comportamiento de las ventas entre sectores económicos.
+
+
+```{r grafico_asociacion_sector_ventas, echo=TRUE, message=FALSE, warning=FALSE}
+library(ggplot2)
+library(dplyr)
+library(haven)
+
+ggplot(datos_asoc, aes(x = as_factor(gsectores), fill = nivel_ventas3)) +
+  geom_bar(position = "fill") +
+  labs(
+    title = "Asociación entre sector económico y nivel de ventas",
+    x = "Sector económico",
+    y = "Proporción",
+    fill = "Nivel de ventas"
+  ) +
+  scale_y_continuous(labels = scales::percent_format()) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+La Figura   muestra la distribución proporcional de los niveles de ventas (bajas, medias y altas) por sector económico. Se observan diferencias claras entre sectores en la composición de los niveles de ventas. Mientras que algunos sectores concentran una alta proporción de empresas con ventas bajas, otros presentan una participación relativamente mayor de ventas medias o altas. Estas variaciones en la estructura interna de los sectores sugieren la existencia de patrones de asociación entre la actividad económica y el nivel de ventas de las empresas.
+
+-   Pruebas estadísticas
+
+
+```{r chi_cuadrado_sector_ventas, echo=TRUE, message=FALSE, warning=FALSE}
+# Prueba Chi-cuadrado de independencia
+chi_sector_ventas <- chisq.test(tabla_asociacion)
+
+chi_sector_ventas
+
+```
+Para evaluar formalmente la relación entre el sector económico y el nivel de ventas, se aplicó la prueba de Chi-cuadrado de independencia sobre la tabla de contingencia sector–ventas. Los resultados muestran un estadístico χ² = 56.518 con 10 grados de libertad y un valor p = 1.642 × 10⁻⁸, lo que indica una asociación estadísticamente significativa entre ambas variables. Este hallazgo confirma que la distribución de los niveles de ventas difiere según el sector económico, respaldando los patrones identificados en el análisis gráfico.
+
+## RANDOM FOREST
+Con el fin de profundizar en el análisis estadístico y explorar relaciones no lineales entre las variables económicas, se evaluó la aplicación de modelos de aprendizaje automático. Considerando la naturaleza mixta de los datos (variables numéricas y categóricas), así como la necesidad de interpretabilidad de los resultados, se seleccionó el algoritmo Random Forest como técnica principal de análisis avanzado. Este método permite identificar la importancia relativa de las variables explicativas y ofrece una alta robustez frente a la presencia de valores atípicos y distribuciones asimétricas, características comunes en datos económicos empresariales.
+
+Paso 1. Preparación de los datos.
+En esta etapa se seleccionó la variable objetivo (ventas totales) junto con un conjunto de variables explicativas de carácter económico, sectorial y geográfico. Las variables categóricas fueron transformadas a formato factor y se eliminaron los registros con valores faltantes, con el fin de obtener un conjunto de datos consistente y adecuado para el entrenamiento del modelo Random Forest.
+
+```{r rf_paso1_preparacion, echo=TRUE, message=FALSE, warning=FALSE}
+library(dplyr)
+
+# 1) Selección de variable objetivo y predictoras
+datos_rf <- base %>%
+  select(
+    ventas_totales,          # Variable objetivo (Y)
+    anio,
+    gsectores,
+    codigo_seccion,
+    codigo_division,
+    codigo_clase,
+    zona_planif,
+    codigo_provincia,
+    codigo_canton,
+    importaciones,
+    exportaciones_netas
+  )
+
+# 2) Conversión de variables categóricas a factor
+datos_rf <- datos_rf %>%
+  mutate(across(
+    c(gsectores, codigo_seccion, codigo_division, codigo_clase,
+      zona_planif, codigo_provincia, codigo_canton),
+    as.factor
+  ))
+
+# 3) Eliminación de filas con valores faltantes
+datos_rf <- na.omit(datos_rf)
+
+# 4) Verificación básica del dataset final
+dim(datos_rf)
+
+```
+
+Paso 2. División de los datos.
+El conjunto de datos preparado fue dividido aleatoriamente en dos subconjuntos: uno de entrenamiento (70% de los registros), utilizado para ajustar el modelo, y otro de prueba (30%), destinado a evaluar su desempeño predictivo sobre datos no observados.
+
+```{r rf_paso2_division, echo=TRUE, message=FALSE, warning=FALSE}
+set.seed(123)  # Para reproducibilidad
+
+# Número total de observaciones
+n <- nrow(datos_rf)
+
+# Índices para el conjunto de entrenamiento (70%)
+indices_train <- sample(1:n, size = 0.7 * n)
+
+# Conjuntos de datos
+train <- datos_rf[indices_train, ]
+test  <- datos_rf[-indices_train, ]
+
+# Verificación de tamaños
+dim(train)
+dim(test)
+
+```
+
+PASO 3: Entrenamiento del modelo Random Forest
+
+```{r rf_paso3A_crear_train_rf, echo=TRUE, message=FALSE, warning=FALSE}
+library(dplyr)
+
+# Crear train_rf y test_rf desde train y test
+train_rf <- train %>%
+  select(
+    ventas_totales,
+    anio,
+    gsectores,
+    codigo_seccion,
+    codigo_division,
+    zona_planif,
+    codigo_provincia,
+    importaciones,
+    exportaciones_netas
+  ) %>%
+  mutate(across(
+    c(gsectores, codigo_seccion, codigo_division, zona_planif, codigo_provincia),
+    as.factor
+  ))
+
+test_rf <- test %>%
+  select(
+    ventas_totales,
+    anio,
+    gsectores,
+    codigo_seccion,
+    codigo_division,
+    zona_planif,
+    codigo_provincia,
+    importaciones,
+    exportaciones_netas
+  ) %>%
+  mutate(across(
+    c(gsectores, codigo_seccion, codigo_division, zona_planif, codigo_provincia),
+    as.factor
+  ))
+
+```
+
+
+
+
+```{r rf_paso3B_entrenar_sin_altacardinalidad, echo=TRUE, message=FALSE, warning=FALSE}
+library(randomForest)
+
+# Detectar factores con más de 53 niveles
+niv <- sapply(train_rf, function(x) if (is.factor(x)) nlevels(x) else 0)
+cols_quitar <- names(niv[niv > 53])
+
+# Crear versiones depuradas de train/test
+train_rf2 <- train_rf %>% select(-all_of(cols_quitar))
+test_rf2  <- test_rf  %>% select(-all_of(cols_quitar))
+
+set.seed(123)
+modelo_rf <- randomForest(
+  ventas_totales ~ .,
+  data = train_rf2,
+  ntree = 500,
+  importance = TRUE
+)
+
+# Mostrar qué columnas se quitaron y el resumen del modelo
+cols_quitar
+modelo_rf
+```
+
+  Paso 4. Evaluación. Se generaron predicciones sobre el conjunto de prueba y se cuantificó el desempeño mediante métricas de error (MAE y RMSE), además de una comparación directa entre valores reales y estimados.
+  
+  
+  
+  
+```{r rf_paso4_evaluacion, echo=TRUE, message=FALSE, warning=FALSE}
+library(knitr)
+
+# Predicciones sobre el conjunto de prueba
+pred_test <- predict(modelo_rf, newdata = test_rf2)
+
+# Valores reales
+real <- test_rf2$ventas_totales
+
+# Métricas de error
+MAE  <- mean(abs(pred_test - real))
+RMSE <- sqrt(mean((pred_test - real)^2))
+
+# Tabla comparativa (primeros 10 casos)
+tabla_comp <- data.frame(
+  Real = real,
+  Predicho = pred_test,
+  Error = pred_test - real
+)
+
+kable(
+  head(tabla_comp, 10),
+  digits = 2,
+  caption = "Comparación Real vs Predicho (primeros 10 registros del conjunto de prueba)"
+)
+
+
+```
+
+Paso 5. Importancia de variables.
+Con el fin de identificar los factores que influyen en las ventas totales, se analizó la importancia relativa de las variables predictoras a partir del modelo Random Forest entrenado. Esta medida permite evaluar la contribución de cada variable en la reducción del error de predicción y facilita la interpretación económica de los resultados.
+```{r rf_parte5A_importancia_grafico, echo=TRUE, message=FALSE, warning=FALSE}
+varImpPlot(
+  modelo_rf,
+  main = "Importancia de variables en el modelo Random Forest"
+)
+
+```
+```{r rf_parte5B_importancia_tabla, echo=FALSE, message=FALSE, warning=FALSE}
+library(knitr)
+
+# Extraer importancia del modelo
+imp <- importance(modelo_rf)
+
+# Construir tabla ordenada
+tabla_importancia <- data.frame(
+  Variable = rownames(imp),
+  IncMSE = imp[, "%IncMSE"]
+)
+
+tabla_importancia <- tabla_importancia[order(-tabla_importancia$IncMSE), ]
+
+# Mostrar tabla
+kable(
+  tabla_importancia,
+  digits = 2,
+  caption = "Importancia de las variables según el modelo Random Forest (%IncMSE)"
+)
+
+```
+El análisis de importancia de variables basado en Random Forest muestra que las importaciones constituyen el principal factor explicativo de las ventas totales, seguido de la clasificación sectorial de las empresas. Las variables asociadas al comercio exterior presentan una influencia positiva, mientras que las variables geográficas y administrativas exhiben un aporte marginal o negativo, sugiriendo que su capacidad explicativa es limitada en comparación con los factores económicos directos.
+  
+
+------------------------------------------------------------------------
+
+# Conclusiones
+
+Finalmente, se sintetizan los aspectos más importantes encontrados en el análisis:
+
+Alta heterogeneidad y asimetría del tejido empresarial
+El análisis descriptivo evidencia una estructura empresarial altamente heterogénea, caracterizada por una fuerte asimetría en las variables económicas, especialmente en las ventas totales. La mayoría de las empresas opera a pequeña escala, mientras que un número reducido concentra valores elevados, confirmando la presencia de micro y pequeñas empresas junto con outliers significativos.
+
+Diferenciación sectorial en el desempeño económico
+La distribución por sectores económicos y el análisis de asociación sector–nivel de ventas muestran que los sectores no presentan comportamientos homogéneos. Existen diferencias claras en la escala productiva y comercial, lo que refleja una especialización sectorial con impactos directos en ventas y estructura empresarial.
+
+Relación positiva entre empleo y desempeño en ventas
+Las plazas equivalentes, tanto totales como desagregadas por sexo, presentan una relación positiva con las ventas totales. Las empresas con mayor dotación laboral tienden a alcanzar mayores niveles de facturación, lo que confirma el vínculo entre capacidad operativa y desempeño económico.
+
+El comercio exterior se asocia con mayor escala empresarial
+Las variables de importaciones y exportaciones muestran una asociación positiva con las ventas totales, indicando que las empresas con participación en mercados internacionales suelen operar a mayor escala. Esto sugiere que la inserción en el comercio exterior está vinculada a un mayor dinamismo económico.
+
+Capacidad explicativa moderada del modelo predictivo
+El modelo Random Forest logra explicar una proporción limitada de la variabilidad de las ventas totales, lo que pone de manifiesto la complejidad del fenómeno empresarial y la influencia de factores adicionales no considerados. No obstante, el modelo identifica correctamente variables clave relacionadas con tamaño, empleo y comercio exterior, aportando valor interpretativo y orientando futuros análisis.
